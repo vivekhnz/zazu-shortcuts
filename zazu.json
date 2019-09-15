@@ -1,0 +1,24 @@
+{
+  "name": "zazu-shortcuts",
+  "version": "1.0.0",
+  "description": "Launch programs and URLs using aliases.",
+  "blocks": {
+    "input": [
+      {
+        "id": "shortcuts",
+        "type": "RootScript",
+        "script": "src/shortcuts.js",
+        "connections": [
+          "execute"
+        ]
+      }
+    ],
+    "output": [
+      {
+        "id": "execute",
+        "type": "UserScript",
+        "script": "src/execute.js"
+      }
+    ]
+  }
+}
