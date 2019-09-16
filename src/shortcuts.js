@@ -39,7 +39,7 @@ module.exports = (ctx) => {
         // build command
         let cmd = overload.cmd;
         for (const arg in args) {
-          cmd = cmd.replace(`{{${arg}}}`, args[arg]);
+          cmd = cmd.replace(new RegExp(`{{${arg}}}`, 'g'), args[arg]);
         }
 
         resolve([{
