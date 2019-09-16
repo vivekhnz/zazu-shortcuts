@@ -37,16 +37,21 @@ module.exports = (ctx) => {
         argStr = argStr.trim();
 
         // build command
-        let cmd = overload.cmd;
-        for (const arg in args) {
-          cmd = cmd.replace(new RegExp(`{{${arg}}}`, 'g'), args[arg]);
+        let value = null;
+        if (overload.cmd) {
+          value = `cmd:${substitute(overload.cmd, args)}`;
         }
-
+        else if (overload.url) {
+          value = `url:${substitute(overload.url, args)}`;
+        }
+        else {
+          resolve([]);
+        }
         resolve([{
           icon: shortcut.icon,
           title: argStr || overload.name,
           subtitle: argStr && overload.name,
-          value: `cmd:${cmd}`
+          value
         }])
       })
     },
@@ -71,4 +76,12 @@ function processArgument(definition, value, typeDefs) {
   // normalize separators
   const components = replaced.split(/\/|\\/);
   return components.join(typeDef.separator);
+}
+
+function substitute(value, args) {
+  let substituted = value;
+  for (const arg in args) {
+    substituted = substituted.replace(new RegExp(`{{${arg}}}`, 'g'), args[arg]);
+  }
+  return substituted;
 }

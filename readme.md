@@ -22,6 +22,13 @@ Example config:
           "dl": "C:\\Users\\%USERNAME%\\Downloads",
           "p": "C:\\Projects"
         }
+      },
+      "googlePage": {
+        "separator": "/",
+        "aliases": {
+          "i": "images",
+          "m": "maps"
+        }
       }
     },
     "shortcuts": {
@@ -135,6 +142,25 @@ Example config:
           }
         ]
       },
+      "g": {
+        "icon": "fa-globe",
+        "overloads": {
+          "0": {
+            "name": "Google",
+            "url": "http://google.com"
+          },
+          "1": {
+            "name": "Google",
+            "url": "http://google.com/{{page}}"
+          }
+        },
+        "args": [
+          {
+            "name": "page",
+            "type": "googlePage"
+          }
+        ]
+      }
     }
   }
 }

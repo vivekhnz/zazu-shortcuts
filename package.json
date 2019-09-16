@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "description": "Launch programs and URLs using aliases.",
   "main": "zazu.js",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "open": "^6.4.0"
+  }
 }
