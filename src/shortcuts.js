@@ -85,7 +85,7 @@ function parseComponents(components, shortcuts, ctx) {
   for (let i = prefix.length - 1; i > 0; i--) {
     const trimmed = prefix.substring(0, i);
     shortcut = shortcuts[trimmed];
-    if (shortcut) {
+    if (shortcut && shortcut.requireSpaceAfterPrefix === false) {
       return {
         shortcut,
         components: [
