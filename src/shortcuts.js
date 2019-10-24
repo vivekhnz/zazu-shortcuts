@@ -3,17 +3,30 @@ const exec = require('child_process').exec
 module.exports = (ctx) => {
   return {
     respondsTo: (query, env = {}) => {
-      const regex = `^(${Object.keys(env.shortcuts).join('|')})($|\\s)`;
+      const prefixes = Object.keys(env.shortcuts)
+        .map(key => {
+          const shortcut = env.shortcuts[key];
+          return {
+            key,
+            requireSpaceAfterPrefix: shortcut.requireSpaceAfterPrefix === undefined
+              ? true
+              : shortcut.requireSpaceAfterPrefix
+          }
+        });
+
+      const withSpacePrefixes = prefixes.filter(p => p.requireSpaceAfterPrefix).map(p => p.key).join('|');
+      const noSpacePrefixes = prefixes.filter(p => !p.requireSpaceAfterPrefix).map(p => p.key).join('|');
+      const regex = `^(((${withSpacePrefixes})($|\\s))|(${noSpacePrefixes}))`;
       return query.match(regex);
     },
     search: (query, env = {}) => {
       return new Promise((resolve, reject) => {
-        const components = query.split(' ').filter(x => x);
-        if (!components || components.length === 0) {
+        const queryComponents = query.split(' ').filter(x => x);
+        if (!queryComponents || queryComponents.length === 0) {
           resolve([]);
         }
-        const prefix = components[0];
-        const shortcut = env.shortcuts[prefix];
+
+        const { shortcut, components } = parseComponents(queryComponents, env.shortcuts, ctx);
         if (!shortcut) {
           resolve([]);
         }
@@ -56,6 +69,35 @@ module.exports = (ctx) => {
       })
     },
   }
+}
+
+function parseComponents(components, shortcuts, ctx) {
+  const prefix = components[0];
+  let shortcut = shortcuts[prefix];
+
+  if (shortcut) {
+    return {
+      shortcut,
+      components: components
+    }
+  }
+
+  for (let i = prefix.length - 1; i > 0; i--) {
+    const trimmed = prefix.substring(0, i);
+    shortcut = shortcuts[trimmed];
+    if (shortcut) {
+      return {
+        shortcut,
+        components: [
+          trimmed,
+          components[0].substring(trimmed.length),
+          ...components.slice(1, components.length)
+        ]
+      }
+    }
+  }
+
+  return null;
 }
 
 function processArgument(definition, value, typeDefs) {
