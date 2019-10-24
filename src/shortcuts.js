@@ -50,7 +50,6 @@ module.exports = (ctx) => {
 
         // build argument permutations
         const permutations = buildPermutations(argBatches);
-        const argStr = permutations.length === 1 && permutations[0].str;
 
         // build commands
         const commands = permutations
