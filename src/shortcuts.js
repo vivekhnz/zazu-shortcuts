@@ -26,7 +26,7 @@ module.exports = (ctx) => {
           resolve([]);
         }
 
-        const { shortcut, components } = parseComponents(queryComponents, env.shortcuts, ctx);
+        const { shortcut, components } = parseComponents(queryComponents, env.shortcuts);
         if (!shortcut) {
           resolve([]);
         }
@@ -37,41 +37,51 @@ module.exports = (ctx) => {
           resolve([]);
         }
 
-        // process arguments (e.g. substitute aliases)
-        const args = {};
-        let argStr = "";
+        // process argument batches (e.g. substitute aliases)
+        const argBatches = [];
         for (let i = 1; i < components.length; i++) {
           const component = components[i];
           const argDef = shortcut.args[i - 1];
-          const processedArg = processArgument(argDef, component, env.types);
-          args[argDef.name] = processedArg;
-          argStr = `${argStr} ${processedArg}`;
+          argBatches.push({
+            arg: argDef.name,
+            values: processArgumentBatch(argDef, component, env.types)
+          })
         }
-        argStr = argStr.trim();
 
-        // build command
-        let value = null;
-        if (overload.cmd) {
-          value = `cmd:${substitute(overload.cmd, args)}`;
-        }
-        else if (overload.url) {
-          value = `url:${encodeURI(substitute(overload.url, args))}`;
-        }
-        else {
+        // build argument permutations
+        const permutations = buildPermutations(argBatches);
+        const argStr = permutations.length === 1 && permutations[0].str;
+
+        // build commands
+        const commands = permutations
+          .map(p => {
+            if (overload.cmd) {
+              return `cmd:${substitute(overload.cmd, p.args)}`;
+            }
+            else if (overload.url) {
+              return `url:${encodeURI(substitute(overload.url, p.args))}`;
+            }
+            return null;
+          })
+          .filter(c => c);
+        if (commands.length === 0) {
           resolve([]);
         }
+
         resolve([{
           icon: shortcut.icon,
-          title: argStr || overload.name,
-          subtitle: argStr && overload.name,
-          value
+          title: (permutations.length === 1 && permutations[0].str) || overload.name,
+          subtitle: permutations.length === 1
+            ? overload.name
+            : permutations.map(p => p.str).join(', '),
+          value: commands
         }])
       })
     },
   }
 }
 
-function parseComponents(components, shortcuts, ctx) {
+function parseComponents(components, shortcuts) {
   const prefix = components[0];
   let shortcut = shortcuts[prefix];
 
@@ -100,10 +110,16 @@ function parseComponents(components, shortcuts, ctx) {
   return null;
 }
 
-function processArgument(definition, value, typeDefs) {
+function processArgumentBatch(definition, value, typeDefs) {
   const typeDef = typeDefs[definition.type];
-  if (!typeDef) return value;
+  if (!typeDef) return value.split(',').filter(x => x);
 
+  return typeDef.enableBatching === false
+    ? [processArgument(value, typeDef)]
+    : value.split(',').filter(x => x).map(arg => processArgument(arg, typeDef));
+}
+
+function processArgument(value, typeDef) {
   // replace aliases
   let replaced = value;
   if (typeDef.aliases) {
@@ -118,6 +134,28 @@ function processArgument(definition, value, typeDefs) {
   // normalize separators
   const components = replaced.split(/\/|\\/);
   return components.join(typeDef.separator);
+}
+
+function buildPermutations(argBatches) {
+  // source: https://stackoverflow.com/a/43053803
+  const f = (a, b) => [].concat(...a.map(d => b.map(e => [].concat(d, e))));
+  const cartesian = (a, b, ...c) => (b ? cartesian(f(a, b), ...c) : a);
+
+  const mapped = argBatches.map(b => b.values);
+  const permutations = cartesian(...mapped);
+  return permutations.map(values => {
+    if (!Array.isArray(values)) {
+      values = [values];
+    }
+    const args = {};
+    for (let i = 0; i < values.length; i++) {
+      args[argBatches[i].arg] = values[i];
+    }
+    return {
+      str: values.join(' '),
+      args
+    }
+  });
 }
 
 function substitute(value, args) {
