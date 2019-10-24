@@ -42,7 +42,7 @@ module.exports = (ctx) => {
           value = `cmd:${substitute(overload.cmd, args)}`;
         }
         else if (overload.url) {
-          value = `url:${substitute(overload.url, args)}`;
+          value = `url:${encodeURI(substitute(overload.url, args))}`;
         }
         else {
           resolve([]);
