@@ -142,6 +142,13 @@ function buildPermutations(argBatches) {
 
   const mapped = argBatches.map(b => b.values);
   const permutations = cartesian(...mapped);
+  if (!permutations) {
+    return [{
+      str: '',
+      args: {}
+    }]
+  }
+
   return permutations.map(values => {
     if (!Array.isArray(values)) {
       values = [values];
