@@ -6,11 +6,17 @@ export type ZazuRootScript<TVariables, TValue> = (context: ZazuContext) => {
 export type ZazuPrefixScript<TVariables, TValue> = (context: ZazuContext) =>
     (value: TValue) => Promise;
 
-interface ZazuContext { }
-
 interface ZazuResult<TValue> {
     icon?: string;
     title?: string;
     subtitle?: string;
     value?: TValue;
+}
+
+interface ZazuContext {
+    console: ZazuConsole;
+}
+
+interface ZazuConsole {
+    log(level: 'verbose' | 'info' | 'warn' | 'error', message: string, data?: any): void;
 }

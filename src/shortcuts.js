@@ -2,10 +2,12 @@
 /**
  * @typedef {import('./typings/zazu-shortcuts').Variables} Variables
  * @typedef {import('./typings/zazu-shortcuts').VariableTypes} VariableTypes
- * @typedef {import('./typings/zazu-shortcuts').Shortcuts} Shortcuts
  * @typedef {import('./typings/zazu-shortcuts').VariableType} VariableType
+ * @typedef {import('./typings/zazu-shortcuts').Shortcuts} Shortcuts
+ * @typedef {import('./typings/zazu-shortcuts').Shortcut} Shortcut
  * @typedef {import('./typings/zazu-shortcuts').Argument} Argument
  * @typedef {import('./typings/zazu-shortcuts').Command} Command
+ * @typedef {import('./typings/zazu').ZazuResult<Command[]>} ZazuResult
  * @typedef {import('./typings/zazu').ZazuRootScript<Variables, Command[]>} Script
  * 
  * @typedef ArgumentBatch
@@ -50,63 +52,19 @@ const script = (ctx) => {
           resolve([]);
         }
 
-        // identify correct overload for specified number of arguments
-        const overload = shortcut.overloads[(components.length - 1).toString()];
-        if (!overload) {
-          resolve([]);
-        }
+        // identify suggestions
+        const suggestNextArgument = query.endsWith(' ')
+          || (components.length === 1 && shortcut.requireSpaceAfterPrefix === false);
+        const index = components.length - (suggestNextArgument ? 0 : 1);
+        const suggestions = getSuggestions(
+          shortcut, index,
+          suggestNextArgument ? '' : components[components.length - 1],
+          components, env.types);
 
-        // process argument batches (e.g. substitute aliases)
-        /** @type {ArgumentBatch[]} */
-        const argBatches = [];
-        for (let i = 1; i < components.length; i++) {
-          const component = components[i];
-          const argDef = shortcut.args[i - 1];
-          argBatches.push({
-            arg: argDef.name,
-            values: processArgumentBatch(argDef, component, env.types)
-          });
-        }
-
-        // build argument permutations
-        const permutations = buildPermutations(argBatches);
-
-        // build commands
-        const commands = permutations
-          .map(p => {
-            /** @type {Command | null} */
-            let command = null;
-            if (overload.cmd) {
-              command = {
-                kind: 'cmd',
-                cmd: substitute(overload.cmd, p.args)
-              }
-            }
-            else if (overload.url) {
-              command = {
-                kind: 'url',
-                url: encodeURI(substitute(overload.url, p.args))
-              }
-            }
-            return command;
-          })
-          .filter(c => c);
-        if (commands.length === 0) {
-          resolve([]);
-        }
-
-        const title = (permutations.length === 1 && permutations[0].str) || overload.name;
-        const subtitle = permutations.length === 1
-          ? overload.name
-          : permutations.map(p => p.str).join(', ');
-        resolve([{
-          icon: shortcut.icon,
-          title,
-          subtitle: subtitle !== title && subtitle,
-          value: commands
-        }])
+        const primaryResult = evaluateComponents(shortcut, components, env.types);
+        resolve(primaryResult ? [primaryResult, ...suggestions] : suggestions);
       })
-    },
+    }
   }
 }
 
@@ -121,7 +79,7 @@ function parseComponents(components, shortcuts) {
   if (shortcut) {
     return {
       shortcut,
-      components: components
+      components
     }
   }
 
@@ -141,6 +99,107 @@ function parseComponents(components, shortcuts) {
   }
 
   return null;
+}
+
+/**
+ * @param {Shortcut} shortcut
+ * @param {number} overloadIndex
+ * @param {string} prefix
+ * @param {VariableTypes} typeDefs
+ * @param {string[]} components
+ * @returns {ZazuResult[]}
+ */
+function getSuggestions(shortcut, overloadIndex, prefix, components, typeDefs) {
+  if (overloadIndex < 1 || shortcut.args.length < overloadIndex) return [];
+
+  const arg = shortcut.args[overloadIndex - 1];
+  if (!arg.type) return [];
+
+  const typeDef = typeDefs[arg.type];
+  if (!typeDef) return [];
+
+  return Object.keys(typeDef.aliases)
+    .filter(alias => alias !== prefix && alias.startsWith(prefix))
+    .sort((a, b) => a.localeCompare(b))
+    .map(alias => {
+      const lastComponent = components[components.length - 1];
+      const autocompletedComponents = prefix && lastComponent.endsWith(prefix)
+        ? [...components.slice(0, components.length - 1), alias]
+        : [...components, alias];
+      const evaluated = evaluateComponents(shortcut, autocompletedComponents, typeDefs);
+      if (!evaluated) return null;
+
+      /** @type {ZazuResult} */
+      const result = {
+        icon: shortcut.icon,
+        title: typeDef.aliases[alias],
+        subtitle: alias,
+        value: evaluated.value
+      };
+      return result;
+    })
+    .filter(x => x);
+}
+
+/**
+ * @param {Shortcut} shortcut
+ * @param {string[]} components
+ * @param {VariableTypes} typeDefs
+ * @returns {ZazuResult | null}
+ */
+function evaluateComponents(shortcut, components, typeDefs) {
+  // identify correct overload for specified number of arguments
+  const overload = shortcut.overloads[(components.length - 1).toString()];
+  if (!overload) return null;
+
+  // process argument batches (e.g. substitute aliases)
+  /** @type {ArgumentBatch[]} */
+  const argBatches = [];
+  for (let i = 1; i < components.length; i++) {
+    const component = components[i];
+    const argDef = shortcut.args[i - 1];
+    argBatches.push({
+      arg: argDef.name,
+      values: processArgumentBatch(argDef, component, typeDefs)
+    });
+  }
+
+  // build argument permutations
+  const permutations = buildPermutations(argBatches);
+
+  // build commands
+  const commands = permutations
+    .map(p => {
+      /** @type {Command | null} */
+      let command = null;
+      if (overload.cmd) {
+        command = {
+          kind: 'cmd',
+          cmd: substitute(overload.cmd, p.args)
+        }
+      }
+      else if (overload.url) {
+        command = {
+          kind: 'url',
+          url: encodeURI(substitute(overload.url, p.args))
+        }
+      }
+      return command;
+    })
+    .filter(c => c);
+  if (commands.length === 0) return null;
+
+  // build result
+  const title = (permutations.length === 1 && permutations[0].str) || overload.name;
+  const subtitle = permutations.length === 1
+    ? overload.name
+    : permutations.map(p => p.str).join(', ');
+  return {
+    icon: shortcut.icon,
+    title,
+    subtitle: subtitle !== title && subtitle,
+    value: commands
+  };
 }
 
 /**
