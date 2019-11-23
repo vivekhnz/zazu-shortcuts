@@ -1,6 +1,24 @@
-const exec = require('child_process').exec
+// @ts-check
+/**
+ * @typedef {import('./typings/zazu-shortcuts').Variables} Variables
+ * @typedef {import('./typings/zazu-shortcuts').VariableTypes} VariableTypes
+ * @typedef {import('./typings/zazu-shortcuts').Shortcuts} Shortcuts
+ * @typedef {import('./typings/zazu-shortcuts').VariableType} VariableType
+ * @typedef {import('./typings/zazu-shortcuts').Argument} Argument
+ * @typedef {import('./typings/zazu-shortcuts').Command} Command
+ * @typedef {import('./typings/zazu').ZazuRootScript<Variables, Command[]>} Script
+ * 
+ * @typedef ArgumentBatch
+ * @property {string} arg
+ * @property {string[]} values
+ * 
+ * @typedef Permutation
+ * @property {string} str
+ * @property {{ [key: string]: string }} args
+**/
 
-module.exports = (ctx) => {
+/** @type Script */
+const script = (ctx) => {
   return {
     respondsTo: (query, env = {}) => {
       const prefixes = Object.keys(env.shortcuts)
@@ -17,7 +35,8 @@ module.exports = (ctx) => {
       const withSpacePrefixes = prefixes.filter(p => p.requireSpaceAfterPrefix).map(p => p.key).join('|');
       const noSpacePrefixes = prefixes.filter(p => !p.requireSpaceAfterPrefix).map(p => p.key).join('|');
       const regex = `^(((${withSpacePrefixes})($|\\s))|(${noSpacePrefixes}))`;
-      return query.match(regex);
+      const matches = query.match(regex);
+      return matches && matches.length > 0;
     },
     search: (query, env = {}) => {
       return new Promise((resolve, reject) => {
@@ -38,6 +57,7 @@ module.exports = (ctx) => {
         }
 
         // process argument batches (e.g. substitute aliases)
+        /** @type {ArgumentBatch[]} */
         const argBatches = [];
         for (let i = 1; i < components.length; i++) {
           const component = components[i];
@@ -45,7 +65,7 @@ module.exports = (ctx) => {
           argBatches.push({
             arg: argDef.name,
             values: processArgumentBatch(argDef, component, env.types)
-          })
+          });
         }
 
         // build argument permutations
@@ -54,13 +74,21 @@ module.exports = (ctx) => {
         // build commands
         const commands = permutations
           .map(p => {
+            /** @type {Command | null} */
+            let command = null;
             if (overload.cmd) {
-              return `cmd:${substitute(overload.cmd, p.args)}`;
+              command = {
+                kind: 'cmd',
+                cmd: substitute(overload.cmd, p.args)
+              }
             }
             else if (overload.url) {
-              return `url:${encodeURI(substitute(overload.url, p.args))}`;
+              command = {
+                kind: 'url',
+                url: encodeURI(substitute(overload.url, p.args))
+              }
             }
-            return null;
+            return command;
           })
           .filter(c => c);
         if (commands.length === 0) {
@@ -80,6 +108,10 @@ module.exports = (ctx) => {
   }
 }
 
+/**
+ * @param {string[]} components
+ * @param {Shortcuts} shortcuts
+ */
 function parseComponents(components, shortcuts) {
   const prefix = components[0];
   let shortcut = shortcuts[prefix];
@@ -109,6 +141,11 @@ function parseComponents(components, shortcuts) {
   return null;
 }
 
+/**
+ * @param {Argument} definition
+ * @param {string} value
+ * @param {VariableTypes} typeDefs
+ */
 function processArgumentBatch(definition, value, typeDefs) {
   const typeDef = typeDefs[definition.type];
   if (!typeDef) return value.split(',').filter(x => x);
@@ -118,6 +155,10 @@ function processArgumentBatch(definition, value, typeDefs) {
     : value.split(',').filter(x => x).map(arg => processArgument(arg, typeDef));
 }
 
+/**
+ * @param {string} value
+ * @param {VariableType} typeDef
+ */
 function processArgument(value, typeDef) {
   // replace aliases
   let replaced = value;
@@ -135,6 +176,10 @@ function processArgument(value, typeDef) {
   return components.join(typeDef.separator);
 }
 
+/**
+ * @param {ArgumentBatch[]} argBatches
+ * @returns {Permutation[]}
+ */
 function buildPermutations(argBatches) {
   // source: https://stackoverflow.com/a/43053803
   const f = (a, b) => [].concat(...a.map(d => b.map(e => [].concat(d, e))));
@@ -164,6 +209,10 @@ function buildPermutations(argBatches) {
   });
 }
 
+/**
+ * @param {string} value
+ * @param {{ [arg: string]: string; }} args
+ */
 function substitute(value, args) {
   let substituted = value;
   for (const arg in args) {
@@ -171,3 +220,5 @@ function substitute(value, args) {
   }
   return substituted;
 }
+
+module.exports = script;
