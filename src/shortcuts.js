@@ -95,12 +95,14 @@ const script = (ctx) => {
           resolve([]);
         }
 
+        const title = (permutations.length === 1 && permutations[0].str) || overload.name;
+        const subtitle = permutations.length === 1
+          ? overload.name
+          : permutations.map(p => p.str).join(', ');
         resolve([{
           icon: shortcut.icon,
-          title: (permutations.length === 1 && permutations[0].str) || overload.name,
-          subtitle: permutations.length === 1
-            ? overload.name
-            : permutations.map(p => p.str).join(', '),
+          title,
+          subtitle: subtitle !== title && subtitle,
           value: commands
         }])
       })
