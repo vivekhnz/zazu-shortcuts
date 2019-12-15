@@ -221,19 +221,27 @@ function processArgumentBatch(definition, value, typeDefs) {
  * @param {VariableType} typeDef
  */
 function processArgument(value, typeDef) {
+  const separatorRegex = /\/|\\/;
+
   // replace aliases
-  let replaced = value;
   if (typeDef.aliases) {
-    for (const alias in typeDef.aliases) {
-      if (value === alias || (value.startsWith(alias)
-        && value[alias.length].match(/\/|\\/))) {
-        replaced = `${typeDef.aliases[alias]}${value.substring(alias.length)}`
+
+    // sort aliases by length desc so we match the most specific alias first
+    const sortedAliases = Object.keys(typeDef.aliases).sort((a, b) => b.length - a.length);
+    for (const alias of sortedAliases) {
+      if (value === alias) {
+        return typeDef.aliases[alias];
+      }
+      if (value.startsWith(alias) && value[alias.length].match(separatorRegex)) {
+        // normalize separators in the segment following the alias
+        const components = value.substring(alias.length).split(separatorRegex);
+        return `${typeDef.aliases[alias]}${components.join(typeDef.separator)}`;
       }
     }
   }
 
   // normalize separators
-  const components = replaced.split(/\/|\\/);
+  const components = value.split(separatorRegex);
   return components.join(typeDef.separator);
 }
 
