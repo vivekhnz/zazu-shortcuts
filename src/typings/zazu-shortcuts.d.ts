@@ -8,8 +8,13 @@ type Shortcuts = { [prefix: string]: Shortcut };
 
 interface VariableType {
     separator: string;
-    aliases: { [alias: string]: string };
+    aliases: { [alias: string]: Alias | string };
     enableBatching?: boolean;
+}
+
+interface Alias {
+    label?: string;
+    value: string;
 }
 
 interface Shortcut {

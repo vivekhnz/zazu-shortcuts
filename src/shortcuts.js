@@ -12,7 +12,11 @@
  * 
  * @typedef ArgumentBatch
  * @property {string} arg
- * @property {string[]} values
+ * @property {ArgumentBatchValue[]} values
+ * 
+ * @typedef ArgumentBatchValue
+ * @property {string} label
+ * @property {string} value
  * 
  * @typedef Permutation
  * @property {string} str
@@ -129,16 +133,24 @@ function getSuggestions(shortcut, overloadIndex, prefix, components, typeDefs) {
       const evaluated = evaluateComponents(shortcut, autocompletedComponents, typeDefs);
       if (!evaluated) return null;
 
+      const aliasDef = typeDef.aliases[alias];
+
       /** @type {ZazuResult} */
       const result = {
         icon: shortcut.icon,
-        title: typeDef.aliases[alias],
+        title: typeof aliasDef === 'string'
+          ? aliasDef
+          : (aliasDef.label || aliasDef.value),
         subtitle: alias,
         value: evaluated.value
       };
       return result;
     })
     .filter(x => x);
+}
+
+function isComplexAlias(alias) {
+
 }
 
 /**
@@ -209,7 +221,10 @@ function evaluateComponents(shortcut, components, typeDefs) {
  */
 function processArgumentBatch(definition, value, typeDefs) {
   const typeDef = typeDefs[definition.type];
-  if (!typeDef) return value.split(',').filter(x => x);
+  if (!typeDef) return value.split(',').filter(x => x).map(x => ({
+    label: x,
+    value: x
+  }));
 
   return typeDef.enableBatching === false
     ? [processArgument(value, typeDef)]
@@ -229,20 +244,42 @@ function processArgument(value, typeDef) {
     // sort aliases by length desc so we match the most specific alias first
     const sortedAliases = Object.keys(typeDef.aliases).sort((a, b) => b.length - a.length);
     for (const alias of sortedAliases) {
+      const aliasDef = typeDef.aliases[alias];
       if (value === alias) {
-        return typeDef.aliases[alias];
+        return typeof aliasDef === 'string'
+          ? {
+            label: aliasDef,
+            value: aliasDef
+          }
+          : {
+            label: aliasDef.label || aliasDef.value,
+            value: aliasDef.value
+          };
       }
       if (value.startsWith(alias) && value[alias.length].match(separatorRegex)) {
         // normalize separators in the segment following the alias
         const components = value.substring(alias.length).split(separatorRegex);
-        return `${typeDef.aliases[alias]}${components.join(typeDef.separator)}`;
+        const suffix = components.join(typeDef.separator);
+        return typeof aliasDef === 'string'
+          ? {
+            label: `${aliasDef}${suffix}`,
+            value: `${aliasDef}${suffix}`
+          }
+          : {
+            label: `${(aliasDef.label || aliasDef.value)}${suffix}`,
+            value: `${aliasDef.value}${suffix}`
+          };
       }
     }
   }
 
   // normalize separators
   const components = value.split(separatorRegex);
-  return components.join(typeDef.separator);
+  const normalized = components.join(typeDef.separator);
+  return {
+    label: normalized,
+    value: normalized
+  };
 }
 
 /**
@@ -255,6 +292,8 @@ function buildPermutations(argBatches) {
   const cartesian = (a, b, ...c) => (b ? cartesian(f(a, b), ...c) : a);
 
   const mapped = argBatches.map(b => b.values);
+
+  /** @type {(ArgumentBatchValue | ArgumentBatchValue[])[]} */
   const permutations = cartesian(...mapped);
   if (!permutations) {
     return [{
@@ -267,12 +306,13 @@ function buildPermutations(argBatches) {
     if (!Array.isArray(values)) {
       values = [values];
     }
+    /** @type {{ [key: string]: string; }} */
     const args = {};
     for (let i = 0; i < values.length; i++) {
-      args[argBatches[i].arg] = values[i];
+      args[argBatches[i].arg] = values[i].value;
     }
     return {
-      str: values.join(' '),
+      str: values.map(v => v.label || v.value).join(' '),
       args
     }
   });

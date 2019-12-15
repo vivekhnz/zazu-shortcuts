@@ -15,19 +15,43 @@ Example config:
       "path": {
         "separator": "\\",
         "aliases": {
-          "pics": "C:\\Users\\%USERNAME%\\Pictures",
-          "docs": "C:\\Users\\%USERNAME%\\Documents",
-          "music": "C:\\Users\\%USERNAME%\\Music",
-          "vids": "C:\\Users\\%USERNAME%\\Videos",
-          "dl": "C:\\Users\\%USERNAME%\\Downloads",
-          "p": "C:\\Projects"
+          "pics": {
+            "label": "Pictures",
+            "value": "C:\\Users\\%USERNAME%\\Pictures"
+          },
+          "docs": {
+            "label": "Documents",
+            "value": "C:\\Users\\%USERNAME%\\Documents"
+          },
+          "music": {
+            "label": "Music",
+            "value": "C:\\Users\\%USERNAME%\\Music"
+          },
+          "vids": {
+            "label": "Videos",
+            "value": "C:\\Users\\%USERNAME%\\Videos"
+          },
+          "dl": {
+            "label": "Downloads",
+            "value": "C:\\Users\\%USERNAME%\\Downloads"
+          },
+          "p": {
+            "label": "Projects",
+            "value": "C:\\Projects"
+          }
         }
       },
       "googlePage": {
         "separator": "/",
         "aliases": {
-          "i": "images",
-          "m": "maps"
+          "i": {
+            "label": "Google Images",
+            "value": "images"
+          },
+          "m": {
+            "label": "Google Maps",
+            "value": "maps"
+          }
         }
       }
     },
